@@ -1,0 +1,166 @@
+name: Build complete Prior Growth script
+
+on:
+  push:
+    paths:
+      - 'parts/READY'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build single standalone Lua file
+        shell: bash
+        run: |
+          set -euo pipefail
+          OUTPUT='PriorGrowth_FINAL_5000_LOCAL_LAVA_FREE_CAMERA_FULL_WALK.lua'
+          cat parts/part*.lua > "$OUTPUT"
+          cat >> "$OUTPUT" <<'LUA_PATCH'
+
+-- ============================================================
+-- v72.8 INTEGRATED FIX: FREE CAMERA / LOCAL LAVA / RELEASE AT FULL
+-- This block is part of this one complete script. Nothing else must be run.
+-- ============================================================
+
+-- Never take ownership of the player's camera for food interaction.
+function _PG_positionFoodCameraOnce(target)
+    State.FoodCameraActive = false
+    pcall(function()
+        local character = getChar()
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        Camera.CameraType = Enum.CameraType.Custom
+        if humanoid then Camera.CameraSubject = humanoid end
+    end)
+    return false
+end
+
+function _PG_restoreFoodCamera()
+    State.FoodCameraActive = false
+    pcall(function()
+        local character = getChar()
+        local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+        Camera.CameraType = Enum.CameraType.Custom
+        if humanoid then Camera.CameraSubject = humanoid end
+        if _PG_PreFoodCameraFOV then Camera.FieldOfView = _PG_PreFoodCameraFOV end
+    end)
+    _PG_PreFoodCameraSubject = nil
+end
+
+-- Lava is relevant only when a named hazard is physically inside the local
+-- radius around the exact dinosaur/food/destination position being checked.
+function _PG_isNearLavaHazard(position, radius, ignoreInstance)
+    if typeof(position) ~= "Vector3" then return false end
+    radius = math.clamp(tonumber(radius) or 24, 10, 80)
+
+    local dangerous = false
+    pcall(function()
+        local overlap = OverlapParams.new()
+        overlap.FilterType = Enum.RaycastFilterType.Blacklist
+        overlap.MaxParts = 128
+        local ignored = {}
+        local character = getChar()
+        if character then table.insert(ignored, character) end
+        if ignoreInstance then table.insert(ignored, ignoreInstance) end
+        overlap.FilterDescendantsInstances = ignored
+
+        for _, part in ipairs(Workspace:GetPartBoundsInRadius(position, radius, overlap)) do
+            if _PG_isLavaHazardInstance(part) then
+                dangerous = true
+                break
+            end
+        end
+    end)
+    return dangerous
+end
+
+function _PG_foodNearLavaHazard(food)
+    if not food or not food.Part or not food.Part.Parent then return true end
+    local radius = math.max(18, math.min(55, _PG_getLavaAvoidRadius()))
+    return _PG_isLavaHazardInstance(food.Part)
+        or _PG_isNearLavaHazard(food.Part.Position, radius, food.Model or food.Part)
+end
+
+-- Do not activate Cretaceous-Uplands movement behaviour merely because lava
+-- exists somewhere in the streamed map. It activates only beside real lava.
+function _PG_isUplandsContext(target)
+    local position = nil
+    if target then
+        if target:IsA("BasePart") then
+            position = target.Position
+        elseif target:IsA("Model") then
+            local part = target.PrimaryPart or target:FindFirstChildWhichIsA("BasePart", true)
+            position = part and part.Position or nil
+        end
+    end
+    if not position then
+        local root = getRoot()
+        position = root and root.Position or nil
+    end
+    return position ~= nil
+        and _PG_isNearLavaHazard(position, math.max(18, _PG_getLavaAvoidRadius()), target)
+end
+
+-- At 100% food the meal is over. Clear every food hold and restore ordinary
+-- movement immediately instead of remaining tethered to the old food.
+task.spawn(function()
+    while true do
+        task.wait(0.2)
+        pcall(function()
+            local food, maximum = getFood()
+            if maximum <= 0 or food < maximum * (State.FullFoodPct / 100) then return end
+
+            if State.HungryMode or State.Eating or State.LockedTarget
+                or State.FoodAnchorPosition or State.FoodCameraActive then
+                State.HungryMode = false
+                State.Eating = false
+                State.CurrentTarget = nil
+                State.LockedTarget = nil
+                State.LockedTargetStalls = 0
+                State.LockedTargetStarted = 0
+                State.FoodAnchorPosition = nil
+                State.FoodAnchorTarget = nil
+                State.InteractionTargetPart = nil
+                State.LastInteractionAttemptAt = 0
+
+                releaseAll()
+                setCharacterAnchored(false)
+                _PG_restoreFoodCamera()
+                _PG_expectMovement(false)
+
+                local character = getChar()
+                local humanoid = character and character:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    humanoid.PlatformStand = false
+                    humanoid.AutoRotate = true
+                    humanoid.Sit = false
+                    pcall(function() humanoid:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+                end
+
+                State.LastAction = "Full - released food and restored normal walking"
+                _PG_setAIState("Roaming", "food full")
+            end
+        end)
+    end
+end)
+
+log("✅ v72.8 integrated: 5000-stud scan, free camera, local lava checks, full-food walking release")
+LUA_PATCH
+
+      - name: Commit complete standalone file
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add PriorGrowth_FINAL_5000_LOCAL_LAVA_FREE_CAMERA_FULL_WALK.lua
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+          git commit -m 'Build complete standalone Prior Growth script'
+          git push
