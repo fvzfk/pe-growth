@@ -1,0 +1,256 @@
+[L9]     wh.Font = Enum.Font.GothamSemibold
+[L10]     wh.TextSize = 12
+[L11]     wh.Parent = pageSet
+[L12]     Instance.new("UICorner", wh).CornerRadius = UDim.new(0, 10)
+[L13]     local wb = Instance.new("TextBox")
+[L14]     wb.Size = UDim2.new(1, 0, 0, 80)
+[L15]     wb.BackgroundColor3 = CARD2
+[L16]     wb.Text = WEBHOOK_URL
+[L17]     wb.PlaceholderText = "Paste webhook here..."
+[L18]     wb.TextColor3 = TXT
+[L19]     wb.TextWrapped = true
+[L20]     wb.Font = Enum.Font.Gotham
+[L21]     wb.TextSize = 12
+[L22]     wb.Parent = pageSet
+[L23]     Instance.new("UICorner", wb).CornerRadius = UDim.new(0, 10)
+[L24]     wb.FocusLost:Connect(function() WEBHOOK_URL = wb.Text end)
+[L25]
+[L26]     local dragging, dragStart, startPos
+[L27]     top.InputBegan:Connect(function(input)
+[L28]         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+[L29]             dragging = true
+[L30]             dragStart = input.Position
+[L31]             startPos = main.Position
+[L32]         end
+[L33]     end)
+[L34]     top.InputChanged:Connect(function(input)
+[L35]         if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+[L36]             local delta = input.Position - dragStart
+[L37]             main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+[L38]         end
+[L39]     end)
+[L40]     top.InputEnded:Connect(function(input)
+[L41]         if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+[L42]             dragging = false
+[L43]         end
+[L44]     end)
+[L45]
+[L46]     for _, object in ipairs(screen:GetDescendants()) do
+[L47]         applyPriorGrowthButtonStyle(object)
+[L48]     end
+[L49]
+[L50]     showTab("Growth")
+[L51]     startESP()
+[L52]
+[L53]     task.spawn(function()
+[L54]         while true do
+[L55]             pcall(function()
+[L56]                 local h, mh = getHealth()
+[L57]                 local food, mf = getFood()
+[L58]                 local oxy, moxy = getOxygen()
+[L59]                 local progress = getStageProgress()
+[L60]                 local curDiet = getDiet()
+[L61]                 summonBtn.Visible = dietEatsMeat()
+[L62]                 plantSummonBtn.Visible = dietEatsPlants()
+[L63]
+[L64]                 if State.AutoGrowthButton and State.AutoGrowthButton.Parent then
+[L65]                     local running = State.Running == true
+[L66]                     State.AutoGrowthButton:SetAttribute("ToggleState", running)
+[L67]                     State.AutoGrowthButton.Text = running and "ON" or "OFF"
+[L68]                     State.AutoGrowthButton.BackgroundColor3 = ACCENT
+[L69]                 end
+[L70]
+[L71]                 if foodEspTextLabel then
+[L72]                     local profile = getSpeciesProfile()
+[L73]                     local allowed = profile and profile.Allowed or {}
+[L74]                     if curDiet == "Carnivore" then
+[L75]                         if normalizeSpeciesToken(getDinoType()) == "austroraptor" then
+[L76]                             foodEspTextLabel.Text = "Austroraptor ESP (corpses / chunks / fish / seashell fallback; no bones / mussels)"
+[L77]                         else
+[L78]                             foodEspTextLabel.Text = "Carnivore ESP (corpses / chunks / fish / SubAdult+ bones / seashell fallback; no mussels)"
+[L79]                         end
+[L80]                     elseif curDiet == "Herbivore" then
+[L81]                         foodEspTextLabel.Text = "Herbivore ESP (plants / fruit)"
+[L82]                     elseif curDiet == "Omnivore" then
+[L83]                         local categories = {}
+[L84]                         for kind, enabled in pairs(allowed) do
+[L85]                             if enabled then table.insert(categories, kind) end
+[L86]                         end
+[L87]                         table.sort(categories)
+[L88]                         foodEspTextLabel.Text = "Omnivore ESP (" .. table.concat(categories, " / ") .. ")"
+[L89]                     else
+[L90]                         foodEspTextLabel.Text = "Food ESP (" .. tostring(curDiet) .. ")"
+[L91]                     end
+[L92]                 end
+[L93]
+[L94]                 local dietLabel = pageG:FindFirstChild("DietInfo")
+[L95]                 if dietLabel then
+[L96]                     if curDiet == "Carnivore" then
+[L97]                         if normalizeSpeciesToken(getDinoType()) == "austroraptor" then
+[L98]                             dietLabel.Text = "Austroraptor - Corpses / Meat Chunks / Seashells / Fish (No Bonepiles or Mussels)"
+[L99]                         else
+[L100]                             dietLabel.Text = "Carnivore - Corpses / Meat Chunks / SubAdult+ Bones / Seashells / Fish (No Mussels)"
+[L101]                         end
+[L102]                     elseif curDiet == "Herbivore" then
+[L103]                         dietLabel.Text = "Herbivore - eats Plants (learning which!)"
+[L104]                     elseif curDiet == "Omnivore" then
+[L105]                         local allowed = {}
+[L106]                         for kind, yes in pairs(getSpeciesProfile().Allowed or {}) do if yes then table.insert(allowed, kind) end end
+[L107]                         table.sort(allowed)
+[L108]                         dietLabel.Text = "Omnivore - " .. table.concat(allowed, " / ")
+[L109]                     else
+[L110]                         dietLabel.Text = "Diet: " .. curDiet
+[L111]                     end
+[L112]                 end
+[L113]                 dinoL.Text = "Dino: " .. getDinoType()
+[L114]                 stageL.Text = "Stage: " .. getStage() .. " " .. math.floor(progress) .. "%"
+[L115]                 local foodPctHud = mf > 0 and (food / mf) * 100 or 0
+[L116]                 foodL.Text = string.format("Food: %.1f/%.1f (%.0f%%)", food, mf, foodPctHud)
+[L117]                 
+[L118]                 -- v43: show learning progress
+[L119]                 local wCount, bCount = 0, 0
+[L120]                 local prefix = getDinoType() .. "|"
+[L121]                 for k in pairs(State.FoodWhitelist) do
+[L122]                     if k:sub(1, #prefix) == prefix then wCount = wCount + 1 end
+[L123]                 end
+[L124]                 for k in pairs(State.FoodBlacklist) do
+[L125]                     if k:sub(1, #prefix) == prefix then bCount = bCount + 1 end
+[L126]                 end
+[L127]                 learnL.Text = "Learned: " .. wCount .. " edible ★, " .. bCount .. " inedible ⛔"
+[L128]                 
+[L129]                 actionL.Text = "Action: " .. State.LastAction .. "\nScanner: " .. tostring(State.FoodsFound)
+[L130]                     .. " usable / " .. tostring(State.RawFoodsFound or 0) .. " detected"
+[L131]                 if State.Saved then
+[L132]                     ss.Text = "Status: SAVED/HEALING"
+[L133]                     ss.TextColor3 = RED
+[L134]                 elseif State.SafeMode then
+[L135]                     ss.Text = "Status: Armed"
+[L136]                     ss.TextColor3 = GREEN
+[L137]                 else
+[L138]                     ss.Text = "Status: Disarmed"
+[L139]                     ss.TextColor3 = Color3.fromRGB(180, 180, 180)
+[L140]                 end
+[L141]
+[L142]                 local root = getRoot()
+[L143]                 local nearest, species, biggerD, biggerSpecies = math.huge, nil, math.huge, nil
+[L144]                 if root then
+[L145]                     nearest, species, biggerD, biggerSpecies = nearestThreat(root.Position)
+[L146]                 end
+[L147]                 local stTxt = State.CurrentState or "Idle"
+[L148]                 stLabels["State"].Text = stTxt
+[L149]                 if stLabels["Reason"] then stLabels["Reason"].Text = State.StateReason or "-" end
+[L150]                 stLabels["Diet"].Text = curDiet .. " | " .. table.concat((function() local t={} for k,v in pairs(getSpeciesProfile().Allowed or {}) do if v then table.insert(t,k) end end table.sort(t) return t end)(), ", ")
+[L151]                 stLabels["Dino"].Text = getDinoType()
+[L152]                 stLabels["Stage"].Text = getStage()
+[L153]                 stLabels["Progress"].Text = math.floor(progress) .. "%"
+[L154]                 stLabels["Health"].Text = string.format("%.0f/%.0f", h, mh)
+[L155]                 stLabels["Food"].Text = string.format("%.1f/%.1f", food, mf)
+[L156]                 if stLabels["Tween Speed"] then
+[L157]                     stLabels["Tween Speed"].Text = tostring(math.floor(_PG_getTweenSpeed())) .. " st/s"
+[L158]                 end
+[L159]                 local wbS = _PG_getWellbeing()
+[L160]                 stLabels["Wellbeing"].Text = wbS.MassMult and ("Mass gain " .. wbS.MassMult .. "%") or "open Wellbeing menu once"
+[L161]                 if stLabels["Next Stage Progress"] then
+[L162]                     stLabels["Next Stage Progress"].Text = wbS.ProgressToNext
+[L163]                         and ((wbS.NextStage and (tostring(wbS.NextStage) .. " ") or "") .. string.format("%.1f%%", wbS.ProgressToNext))
+[L164]                         or "-"
+[L165]                 end
+[L166]                 stLabels["Adult Progress"].Text = wbS.AdultProgress and (wbS.AdultProgress .. "%") or "-"
+[L167]                 stLabels["Oxygen"].Text = (moxy > 0) and string.format("%.0f/%.0f", oxy, moxy) or "N/A"
+[L168]                 stLabels["Nearest Dino"].Text = (nearest < math.huge) and (species .. " " .. math.floor(nearest) .. "st") or "None"
+[L169]                 stLabels["Nearest Larger Dino"].Text = (biggerD < math.huge) and (biggerSpecies .. " " .. math.floor(biggerD) .. "st") or "None"
+[L170]                 if stLabels["Target"] then
+[L171]                     local shownTarget = State.CurrentTarget or State.LockedTarget
+[L172]                     stLabels["Target"].Text = shownTarget and ((shownTarget.Kind or "Food") .. ": " .. tostring(shownTarget.Name)) or "None"
+[L173]                 end
+[L174]                 if stLabels["Scan"] then stLabels["Scan"].Text = tostring(State.FoodsFound) .. " usable / "
+[L175]                     .. tostring(State.RawFoodsFound or 0) .. " detected | "
+[L176]                     .. string.format("%.2fs", (State.ScanStats and State.ScanStats.LastDuration) or 0)
+[L177]                     .. " | Workspace " .. tostring(State.FullWorkspaceScanVisited or 0) end
+[L178]                 if stLabels["Unstucks"] then stLabels["Unstucks"].Text = tostring(State.UnstuckCount or 0) end
+[L179]                 stLabels["Last Action"].Text = State.LastAction
+[L180]                 stLabels["Food Eaten"].Text = tostring(State.FoodEaten)
+[L181]             end)
+[L182]             task.wait(0.5)
+[L183]         end
+[L184]     end)
+[L185] end
+[L186]
+[L187] log("=== CONSUMPTION/CAMERA/UI FIX LOADED ===")
+[L188] log("✅ ONE CONTROLLER: no startup race between safe-location and eating tasks")
+[L189] log("✅ HUNGER: below threshold enters food search; locked meals continue until the target is depleted/gone")
+[L190] log("✅ CARNIVORES: corpses, meat chunks, fish and stage-valid bones; no egg remains")
+[L191] log("✅ RAW ESP: displays indexed corpses/chunks/fish without hiding detection failures")
+[L192] log("✅ CORPSES: exact Physics and Host rigs only; Workspace/Visual/collectibles rejected")
+[L193] log("✅ GIGANTORAPTOR: anthills, insects, fruits and plants only; corpses are excluded")
+[L194] log("✅ OMNIVORES: individual profiles instead of generic diet assumptions")
+[L195] log("✅ SCANNER: event-driven Ragdoll/ConsumableFoliage/TermiteMound + meat-container index")
+[L196] log("✅ SAFE MODE: fresh HP loss only; stale/no-damage Rest states are rejected")
+[L197] log("✅ UNSTUCK: movement watchdog clears bad flags, relocates and resumes automatically")
+[L198] log("✅ PROGRESS: wellbeing, stage percentage and automatic menu return remain enabled")
+[L199] log("✅ ESP/UI: foods, selected target, nearby dinosaurs, scanner stats and recovery state")
+[L200] log("✅ v72.4 DIETS: strict species profiles, no generic omnivore meat, Sinopterus exception")
+[L201] log("✅ v72.4 WATER: Suchomimus and Deinocheirus underwater food hidden from scanner/ESP")
+[L202] log("✅ v74.2 SCANNER: carnivore food traverses every currently replicated Workspace subtree with no distance cutoff; other diets retain the 50000-stud budgeted scope")
+[L203] log("✅ GALLIMIMUS: Monanthesia/Gleicheniaceae/Coniopteris only; Magnolia/Palaeoaster/Pine/stumps rejected")
+[L204] log("✅ MOVEMENT: one direct food tween only; no terrain clearing, alternate-ground search, descent, or eating settle")
+[L205] log("✅ FOOD SAFETY: maximum two nearby dinosaurs; every one must be a strictly smaller stage")
+[L206] log("✅ EMBED: weight field removed; same user/species message reuse preserved")
+[L207] log("✅ AUSTRORAPTOR: bonepiles excluded from scanner, ESP, targeting and interaction")
+[L208] detectControls()
+[L209] okGUI, errGUI = pcall(_PG_createGUI)
+[L210] if not okGUI then
+[L211]     log("ERROR in createGUI: " .. tostring(errGUI))
+[L212]     warn("[PE] createGUI failed: " .. tostring(errGUI))
+[L213] end
+[L214] task.delay(1.5, function()
+[L215]     State.DietCache = nil
+[L216]     log("Post-load: Dino: " .. getDinoType() .. " | Diet: " .. getDiet())
+[L217]     _PG_clearFalsePlantBlacklists()
+[L218]     -- v48: purge any meatish names wrongly learned as edible by plant-eaters
+[L219]     -- (the Foliage/BonePile bug may have whitelisted bones before this fix)
+[L220]     if not dietEatsMeat() then
+[L221]         local purged = 0
+[L222]         for key in pairs(State.FoodWhitelist) do
+[L223]             local name = key:match("|(.+)$")
+[L224]             if name and isMeatishName(name) then
+[L225]                 State.FoodWhitelist[key] = nil
+[L226]                 purged = purged + 1
+[L227]             end
+[L228]         end
+[L229]         for key in pairs(State.FoodBlacklist) do
+[L230]             local name = key:match("|(.+)$")
+[L231]             if name and isMeatishName(name) then
+[L232]                 -- keep blacklisted (harmless) but ensure it stays blacklisted
+[L233]             end
+[L234]         end
+[L235]         if purged > 0 then
+[L236]             _PG_saveState()
+[L237]             log("[LEARN] Purged " .. purged .. " meat/bone entries wrongly whitelisted for a plant-eater")
+[L238]         end
+[L239]     end
+[L240] end)
+[L241]
+[L242]
+[L243] -- ============================================================
+[L244] -- CONSUMPTION/CAMERA/UI FIX BUILD END
+[L245] -- Complete v70 foundation retained and upgraded.
+[L246] -- ============================================================
+[L247]
+[L248] log("✅ LAVA: special route handling activates only when lava is actually nearby")
+[L249] log("✅ TWEEN: collisions disabled during direct food travel; no food terrain settling or generated support Parts")
+[L250]
+[L251] log("✅ v74.2 DIRECT FOOD TWEEN: speed=" .. tostring(math.floor(_PG_getTweenSpeed())) .. " st/s | global carnivore Workspace ESP | prompt-state ignored | finish-current-target lock")
+[L252]
+[L253] log("✅ v74.4 HERBIVORES: nearest Plant/Fruit only; corpse leakage blocked; raw nearby ESP independent of prompt state")
+[L254] log("✅ v74.4 MOVEMENT: whole-model high-sky tween; Adult+ carnivore destinations rejected before descent and on arrival")
+[L255] log("✅ v74.4 PERFORMANCE: generic full Workspace traversal is carnivore-only; tagged foliage uses incremental caching")
+[L256] log("✅ v74.4 VOID: automatic void CFrame pullback disabled completely")
+[L257]
+[L258] log("✅ v74.6 STRICT FOOD: corpse=Physics only; bone=BonePile only; Workspace/Visual never food")
+[L259] log("✅ v74.6 PRIORITY: failed carrion never forces seashells; immediate Physics/meat/BonePile rescan")
+[L260] log("✅ v74.6 MOVEMENT: collision-free overhead cliff noclip plus one correction; no terrain landing resolver")
+[L261]
+[L262] log("✅ v74.5 MEAL HARD LOCK: zero tweens/terrain correction between bites; no invisible Parts")
+[L263] log("✅ v74.5 EATING: persistent hold-E + click-E retries until full or genuine depletion")
+[L264] log("✅ v74.5 SURFACE: robust visible food support prevents buried limbs from routing into caves")
